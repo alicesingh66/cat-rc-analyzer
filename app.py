@@ -70,18 +70,63 @@
 #         for key, value in results.items():
 #             st.write(f"**{key}:** {value}")
 
+import re
+import streamlit as st
 import nltk
+from nltk.corpus import stopwords, wordnet as wn
+from nltk.tokenize import TreebankWordTokenizer, sent_tokenize
+from collections import Counter
+from textblob import TextBlob
+import textstat
+import pandas as pd
+
+# --- Download NLTK resources ---
 nltk.download('stopwords', quiet=True)
 nltk.download('wordnet', quiet=True)
 nltk.download('omw-1.4', quiet=True)
 
+# --- Initialize tokenizer ---
+tokenizer = TreebankWordTokenizer()
 
-from nltk.corpus import wordnet as wn
-from nltk.tokenize import sent_tokenize
-from collections import Counter
-from textblob import TextBlob
+# --- Helper Functions ---
+def clean_text(text):
+    return re.sub(r'\s+', ' ', text).strip()
 
-# --- Hard Words & Meaning ---
+def analyze_metrics(text):
+    text = clean_text(text)
+    words = tokenizer.tokenize(text.lower())
+    words = [w for w in words if w.isalpha()]
+    stop_words = set(stopwords.words('english'))
+    content_words = [w for w in words if w not in stop_words]
+
+    lexical_density = len(content_words) / len(words) if words else 0
+    flesch = textstat.flesch_reading_ease(text)
+    fk_grade = textstat.flesch_kincaid_grade(text)
+
+    if fk_grade < 10:
+        level = "Easy (Light RC)"
+        color = "#4CAF50"
+    elif 10 <= fk_grade < 12:
+        level = "Moderate (Medium RC)"
+        color = "#FFC107"
+    elif 12 <= fk_grade < 14:
+        level = "Hard (Dense RC)"
+        color = "#FF5722"
+    elif 14 <= fk_grade < 16:
+        level = "Very Hard (Academic RC)"
+        color = "#E91E63"
+    else:
+        level = "Extreme (Research RC)"
+        color = "#9C27B0"
+
+    return {
+        "Total Words": len(words),
+        "Lexical Density": f"{lexical_density:.3f}",
+        "Flesch Reading Ease": f"{flesch:.2f}",
+        "Flesch-Kincaid Grade": fk_grade,
+        "Difficulty Level": (level, color)
+    }
+
 def get_hard_words(text, top_n=10):
     words = tokenizer.tokenize(text.lower())
     words = [w for w in words if w.isalpha() and w not in stopwords.words('english')]
@@ -95,7 +140,6 @@ def get_hard_words(text, top_n=10):
         word_meanings[w] = meaning
     return word_meanings
 
-# --- Tone ---
 def get_tone(text):
     blob = TextBlob(text)
     polarity = blob.sentiment.polarity
@@ -106,17 +150,14 @@ def get_tone(text):
     else:
         return "Neutral"
 
-# --- Central Idea ---
 def get_central_idea(text):
     sentences = sent_tokenize(text)
     words = [w.lower() for w in tokenizer.tokenize(text) if w.isalpha() and w not in stopwords.words('english')]
     freq = Counter(words)
-    # score sentences by sum of content word frequency
     scored = [(s, sum(freq.get(w.lower(),0) for w in tokenizer.tokenize(s) if w.isalpha())) for s in sentences]
     scored.sort(key=lambda x: x[1], reverse=True)
     return scored[0][0] if scored else "Could not determine"
 
-# --- Structure (simple guess) ---
 def get_structure(text):
     sentences = sent_tokenize(text)
     if any(w in text.lower() for w in ["because", "therefore", "however", "thus"]):
@@ -126,3 +167,52 @@ def get_structure(text):
     else:
         return "Narrative/Short"
 
+# --- Streamlit UI ---
+st.set_page_config(page_title="CAT RC Analyzer", layout="wide")
+st.title("📊 CAT RC Analyzer - Full RC Insights")
+
+st.sidebar.header("Instructions")
+st.sidebar.write("""
+1. Paste your RC passage in the text box.
+2. Click 'Analyze RC'.
+3. View metrics, top hard words, tone, central idea, and structure.
+""")
+
+text_input = st.text_area("Paste your RC passage below:", height=200)
+
+if st.button("Analyze RC"):
+    if not text_input.strip():
+        st.warning("Please enter some text!")
+    else:
+        # --- Metrics ---
+        metrics = analyze_metrics(text_input)
+        col1, col2, col3 = st.columns(3)
+        col1.metric("📝 Total Words", metrics["Total Words"])
+        col2.metric("📖 Lexical Density", metrics["Lexical Density"])
+        col3.metric("📗 Flesch Reading Ease", metrics["Flesch Reading Ease"])
+
+        col4, col5 = st.columns(2)
+        col4.metric("🎓 FK Grade", metrics["Flesch-Kincaid Grade"])
+        level, color = metrics["Difficulty Level"]
+        col5.markdown(f"<div style='padding:10px; background-color:{color}; color:white; text-align:center; border-radius:5px;'>🔥 {level}</div>", unsafe_allow_html=True)
+
+        # --- Top Hard Words ---
+        hard_words = get_hard_words(text_input)
+        if hard_words:
+            st.subheader("Top 10 Hard Words & Meanings")
+            st.table(pd.DataFrame(list(hard_words.items()), columns=["Word", "Meaning"]))
+
+        # --- Tone ---
+        tone = get_tone(text_input)
+        st.subheader("Tone of Passage")
+        st.write(f"**{tone}**")
+
+        # --- Central Idea ---
+        central_idea = get_central_idea(text_input)
+        st.subheader("Central Idea")
+        st.write(central_idea)
+
+        # --- Structure ---
+        structure = get_structure(text_input)
+        st.subheader("Passage Structure (Approx.)")
+        st.write(structure)
