@@ -1,3 +1,5 @@
 streamlit
-textstat
 nltk
+textstat
+textblob
+pandas
