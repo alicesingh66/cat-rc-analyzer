@@ -1,13 +1,19 @@
 import re
+import os
 import nltk
 import textstat
 import streamlit as st
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 
-# Download NLTK resources
-nltk.download('punkt', quiet=True)
-nltk.download('stopwords', quiet=True)
+# --- Setup NLTK for Streamlit Cloud ---
+nltk_data_dir = os.path.join(os.getcwd(), "nltk_data")
+if not os.path.exists(nltk_data_dir):
+    os.makedirs(nltk_data_dir)
+
+nltk.data.path.append(nltk_data_dir)
+nltk.download('punkt', download_dir=nltk_data_dir, quiet=True)
+nltk.download('stopwords', download_dir=nltk_data_dir, quiet=True)
 
 # --- Helper Functions ---
 def clean_text(text):
@@ -65,5 +71,3 @@ if st.button("Analyze RC"):
         st.markdown("### 📝 Analysis Result")
         for key, value in results.items():
             st.write(f"**{key}:** {value}")
-
-
