@@ -3,3 +3,4 @@ nltk
 textstat
 textblob
 pandas
+openai
