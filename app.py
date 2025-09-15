@@ -74,7 +74,7 @@ import re
 import streamlit as st
 import nltk
 from nltk.corpus import stopwords, wordnet as wn
-from nltk.tokenize import TreebankWordTokenizer, sent_tokenize
+from nltk.tokenize import TreebankWordTokenizer
 from collections import Counter
 from textblob import TextBlob
 import textstat
@@ -91,6 +91,11 @@ tokenizer = TreebankWordTokenizer()
 # --- Helper Functions ---
 def clean_text(text):
     return re.sub(r'\s+', ' ', text).strip()
+
+def simple_sent_tokenize(text):
+    """Split text into sentences without using NLTK Punkt"""
+    sentences = re.split(r'(?<=[.!?])\s+', text.strip())
+    return [s for s in sentences if s]
 
 def analyze_metrics(text):
     text = clean_text(text)
@@ -151,7 +156,7 @@ def get_tone(text):
         return "Neutral"
 
 def get_central_idea(text):
-    sentences = sent_tokenize(text)
+    sentences = simple_sent_tokenize(text)
     words = [w.lower() for w in tokenizer.tokenize(text) if w.isalpha() and w not in stopwords.words('english')]
     freq = Counter(words)
     scored = [(s, sum(freq.get(w.lower(),0) for w in tokenizer.tokenize(s) if w.isalpha())) for s in sentences]
@@ -159,7 +164,7 @@ def get_central_idea(text):
     return scored[0][0] if scored else "Could not determine"
 
 def get_structure(text):
-    sentences = sent_tokenize(text)
+    sentences = simple_sent_tokenize(text)
     if any(w in text.lower() for w in ["because", "therefore", "however", "thus"]):
         return "Argumentative/Expository"
     elif len(sentences) > 8:
@@ -216,3 +221,5 @@ if st.button("Analyze RC"):
         structure = get_structure(text_input)
         st.subheader("Passage Structure (Approx.)")
         st.write(structure)
+
+
