@@ -1,19 +1,15 @@
 import re
-import os
 import nltk
 import textstat
 import streamlit as st
 from nltk.corpus import stopwords
-from nltk.tokenize import word_tokenize
+from nltk.tokenize import TreebankWordTokenizer
 
-# --- Setup NLTK for Streamlit Cloud ---
-nltk_data_dir = os.path.join(os.getcwd(), "nltk_data")
-if not os.path.exists(nltk_data_dir):
-    os.makedirs(nltk_data_dir)
+# --- Setup NLTK stopwords ---
+nltk.download('stopwords', quiet=True)
 
-nltk.data.path.append(nltk_data_dir)
-nltk.download('punkt', download_dir=nltk_data_dir, quiet=True)
-nltk.download('stopwords', download_dir=nltk_data_dir, quiet=True)
+# Initialize tokenizer
+tokenizer = TreebankWordTokenizer()
 
 # --- Helper Functions ---
 def clean_text(text):
@@ -26,8 +22,10 @@ def analyze_text(text):
     if not text:
         return None, "Please enter some text!"
     
-    words = word_tokenize(text.lower())
+    # Use Treebank tokenizer instead of word_tokenize
+    words = tokenizer.tokenize(text.lower())
     words = [w for w in words if w.isalpha()]
+    
     stop_words = set(stopwords.words('english'))
     content_words = [w for w in words if w not in stop_words]
     
@@ -71,3 +69,5 @@ if st.button("Analyze RC"):
         st.markdown("### 📝 Analysis Result")
         for key, value in results.items():
             st.write(f"**{key}:** {value}")
+
+
