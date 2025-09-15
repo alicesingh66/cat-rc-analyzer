@@ -79,8 +79,9 @@ from collections import Counter
 from textblob import TextBlob
 import textstat
 import pandas as pd
+import openai
 
-# --- Download NLTK resources ---
+# --- NLTK downloads ---
 nltk.download('stopwords', quiet=True)
 nltk.download('wordnet', quiet=True)
 nltk.download('omw-1.4', quiet=True)
@@ -88,12 +89,15 @@ nltk.download('omw-1.4', quiet=True)
 # --- Initialize tokenizer ---
 tokenizer = TreebankWordTokenizer()
 
+# --- OpenAI API key via Streamlit secrets ---
+openai.api_key = st.secrets["OPENAI_API_KEY"]
+
 # --- Helper Functions ---
 def clean_text(text):
     return re.sub(r'\s+', ' ', text).strip()
 
 def simple_sent_tokenize(text):
-    """Split text into sentences without using NLTK Punkt"""
+    """Split text into sentences without NLTK Punkt"""
     sentences = re.split(r'(?<=[.!?])\s+', text.strip())
     return [s for s in sentences if s]
 
@@ -135,7 +139,7 @@ def analyze_metrics(text):
 def get_hard_words(text, top_n=10):
     words = tokenizer.tokenize(text.lower())
     words = [w for w in words if w.isalpha() and w not in stopwords.words('english')]
-    hard_words = [w for w in words if len(w) >= 7]  # simple length filter
+    hard_words = [w for w in words if len(w) >= 7]
     freq = Counter(hard_words)
     top_words = freq.most_common(top_n)
     word_meanings = {}
@@ -172,6 +176,26 @@ def get_structure(text):
     else:
         return "Narrative/Short"
 
+# --- AI Analysis ---
+def ai_analyze_rc(passage):
+    prompt = f"""
+    Analyze the following CAT Reading Comprehension passage.
+
+    1. Central idea in one sentence
+    2. Tone (critical, neutral, formal, etc.)
+    3. Structure (narrative, expository, argumentative)
+    4. Extract 5 difficult words with meanings in context
+    5. Suggest 3 CAT-style questions with answers
+
+    Passage:
+    {passage}
+    """
+    response = openai.ChatCompletion.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": prompt}]
+    )
+    return response.choices[0].message["content"]
+
 # --- Streamlit UI ---
 st.set_page_config(page_title="CAT RC Analyzer", layout="wide")
 st.title("📊 CAT RC Analyzer - Full RC Insights")
@@ -180,7 +204,7 @@ st.sidebar.header("Instructions")
 st.sidebar.write("""
 1. Paste your RC passage in the text box.
 2. Click 'Analyze RC'.
-3. View metrics, top hard words, tone, central idea, and structure.
+3. View metrics, hard words, tone, central idea, structure, and AI insights.
 """)
 
 text_input = st.text_area("Paste your RC passage below:", height=200)
@@ -189,7 +213,7 @@ if st.button("Analyze RC"):
     if not text_input.strip():
         st.warning("Please enter some text!")
     else:
-        # --- Metrics ---
+        # --- Rule-based Metrics ---
         metrics = analyze_metrics(text_input)
         col1, col2, col3 = st.columns(3)
         col1.metric("📝 Total Words", metrics["Total Words"])
@@ -199,7 +223,10 @@ if st.button("Analyze RC"):
         col4, col5 = st.columns(2)
         col4.metric("🎓 FK Grade", metrics["Flesch-Kincaid Grade"])
         level, color = metrics["Difficulty Level"]
-        col5.markdown(f"<div style='padding:10px; background-color:{color}; color:white; text-align:center; border-radius:5px;'>🔥 {level}</div>", unsafe_allow_html=True)
+        col5.markdown(
+            f"<div style='padding:10px; background-color:{color}; color:white; text-align:center; border-radius:5px;'>🔥 {level}</div>",
+            unsafe_allow_html=True
+        )
 
         # --- Top Hard Words ---
         hard_words = get_hard_words(text_input)
@@ -209,17 +236,25 @@ if st.button("Analyze RC"):
 
         # --- Tone ---
         tone = get_tone(text_input)
-        st.subheader("Tone of Passage")
+        st.subheader("Tone of Passage (Rule-based)")
         st.write(f"**{tone}**")
 
         # --- Central Idea ---
         central_idea = get_central_idea(text_input)
-        st.subheader("Central Idea")
+        st.subheader("Central Idea (Rule-based)")
         st.write(central_idea)
 
         # --- Structure ---
         structure = get_structure(text_input)
-        st.subheader("Passage Structure (Approx.)")
+        st.subheader("Passage Structure (Rule-based Approx.)")
         st.write(structure)
+
+        # --- AI Analysis ---
+        with st.spinner("Generating AI-based analysis..."):
+            ai_result = ai_analyze_rc(text_input)
+            st.subheader("AI-Based Full Analysis")
+            st.write(ai_result)
+
+
 
 
