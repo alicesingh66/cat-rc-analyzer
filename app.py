@@ -1,5 +1,8 @@
 import re
 import nltk
+nltk.download('punkt', quiet=True)
+nltk.download('stopwords', quiet=True)
+
 import textstat
 import tkinter as tk
 from tkinter import scrolledtext, messagebox
@@ -77,5 +80,6 @@ result_box.pack(padx=10, pady=5)
 result_box.config(state="disabled")
 
 root.mainloop()
+
 
 
