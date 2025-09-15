@@ -70,6 +70,10 @@
 #         for key, value in results.items():
 #             st.write(f"**{key}:** {value}")
 
+import nltk
+nltk.download('stopwords', quiet=True)
+nltk.download('wordnet', quiet=True)
+nltk.download('omw-1.4', quiet=True)
 
 
 from nltk.corpus import wordnet as wn
@@ -121,3 +125,4 @@ def get_structure(text):
         return "Descriptive/Expository"
     else:
         return "Narrative/Short"
+
